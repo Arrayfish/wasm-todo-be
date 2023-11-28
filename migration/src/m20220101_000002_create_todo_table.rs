@@ -1,5 +1,7 @@
 use sea_orm_migration::prelude::*;
 
+use crate::m20220101_000001_create_todolist_table::TodoList;
+
 #[derive(DeriveMigrationName)]
 pub struct Migration;
 
@@ -21,6 +23,14 @@ impl MigrationTrait for Migration {
                     )
                     .col(ColumnDef::new(Todo::Title).string().not_null())
                     .col(ColumnDef::new(Todo::Completed).string().not_null())
+                    .col(ColumnDef::new(Todo::ListId).integer().not_null())
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk-todo-todolist_id")
+                            .from(Todo::Table, Todo::ListId)
+                            .to(TodoList::Table, TodoList::Id)
+
+                    )
                     .to_owned(),
             )
             .await
@@ -35,17 +45,10 @@ impl MigrationTrait for Migration {
 }
 
 #[derive(DeriveIden)]
-enum Todo {
+pub enum Todo {
     Table,
     Id,
+    ListId,
     Title,
     Completed,
-}
-
-#[derive(DeriveIdev)]
-enum TodoList{
-    Table,
-    Id,
-    ListName,
-    Todos,
 }

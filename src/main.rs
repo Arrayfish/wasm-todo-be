@@ -1,4 +1,5 @@
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
+use migration::{Migrator, MigratorTrait};
 
 #[get("/")]
 async fn hello() -> impl Responder {
@@ -11,7 +12,7 @@ async fn echo(req_body: String) -> impl Responder {
 }
 
 
-async fn get_todos() -> impl Responder {
+async fn get_all_todolists_and_todos() -> impl Responder {
     // get user id from the session
     
     // access to the database
@@ -35,6 +36,8 @@ async fn delete_todo() -> impl Responder {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    let connection = sea_orm::Database::connect(&database_url).await?;
+    Migrator::up(&connection, None).await?;
     HttpServer::new(|| {
         App::new()
             .service(

@@ -10,17 +10,16 @@ impl MigrationTrait for Migration {
         manager
             .create_table(
                 Table::create()
-                    .table(Todo::Table)
+                    .table(TodoList::Table)
                     .if_not_exists()
                     .col(
-                        ColumnDef::new(Todo::Id)
+                        ColumnDef::new(TodoList::Id)
                             .integer()
                             .not_null()
                             .auto_increment()
                             .primary_key(),
                     )
-                    .col(ColumnDef::new(Todo::Title).string().not_null())
-                    .col(ColumnDef::new(Todo::Completed).string().not_null())
+                    .col(ColumnDef::new(TodoList::ListName).string().not_null())
                     .to_owned(),
             )
             .await
@@ -29,15 +28,14 @@ impl MigrationTrait for Migration {
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         // Replace the sample below with your own migration scripts
         manager
-            .drop_table(Table::drop().table(Todo::Table).to_owned())
+            .drop_table(Table::drop().table(TodoList::Table).to_owned())
             .await
     }
 }
 
-#[derive(DeriveIdev)]
-enum TodoList{
+#[derive(DeriveIden)]
+pub enum TodoList{
     Table,
     Id,
     ListName,
-    Todos,
 }
