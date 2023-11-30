@@ -7,10 +7,8 @@ edition = "2021"
 [workspace]
 members = [".", "entity", "migration"]
 
-[dependancies]
-entity = { path = "entity" }
-migration = { path = "migration" }
-
 [dependencies]
 actix-web = "4"
 sea-orm = {version = "0.12.7", features=["sqlx-postgres", "runtime-tokio-native-tls", "macros", "mock"]}
+entity = { path = "entity" }
+migration = { path = "migration" }
