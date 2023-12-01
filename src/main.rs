@@ -1,6 +1,12 @@
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 use sea_orm::{Database, EntityTrait, FromQueryResult, IntoActiveModel, QueryFilter, QueryOrder, Set, DatabaseConnection};
 use entity::{prelude::*, *};
+
+#[derive(Debug, Clone)]
+pub struct AppState {
+    pub db: DatabaseConnection,
+}
+
 #[get("/")]
 async fn hello() -> impl Responder {
     HttpResponse::Ok().body("Hello world!")
@@ -36,9 +42,10 @@ async fn delete_todo() -> impl Responder {
 async fn main() -> std::io::Result<()> {
     let database_url = "postgres://postgres:password@localhost:5436/todo_db";
     let db = Database::connect(database_url).await.unwrap();
+    let app_state = AppState { db: db.clone() };
     HttpServer::new(|| {
         App::new()
-        .app_data(web::Data::new(db))
+        .app_data(web::Data::new(app_state))
             .service(
                 web::scope("/todo")
                     .route("/todos", web::get().to(get_todos))
