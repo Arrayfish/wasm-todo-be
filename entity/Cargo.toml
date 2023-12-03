@@ -6,3 +6,4 @@ publish = false
 
 [dependencies]
 sea-orm = { version = "0.12" }
+serde = { version = "1.0.193", features = ["derive"] }

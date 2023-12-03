@@ -1,6 +1,7 @@
-use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
-use sea_orm::{Database, EntityTrait, FromQueryResult, IntoActiveModel, QueryFilter, QueryOrder, Set, DatabaseConnection};
+use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder, Result};
+use sea_orm::{Database, EntityTrait, FromQueryResult, IntoActiveModel, QueryFilter, QueryOrder, Set, DatabaseConnection, ActiveModelTrait};
 use entity::{prelude::*, *};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone)]
 pub struct AppState {
@@ -17,24 +18,39 @@ async fn echo(req_body: String) -> impl Responder {
     HttpResponse::Ok().body(req_body)
 }
 
-async fn get_all_todolists_and_todos(db: web::Data<DatabaseConnection>) -> impl Responder {
-    // get user id from the session
-    let todo_lists: Vec<todo_list::Model> = TodoList::all(db.get_ref()).await.unwrap();
+#[derive(Debug, Clone, Serialize)]
+pub struct AllTodoLists {
+    pub todo_lists: Vec<todo_list::Model>,
+    pub todos: Vec<todo::Model>,
+}
+async fn get_all_todolists_and_todos(data: web::Data<AppState>) -> Result<impl Responder> {
+    // TODO: get user id from the session
+    let db = &data.db;
+    let all_todo_lists: Vec<todo_list::Model> = TodoList::find().all(db).await.unwrap();
+    let all_todos: Vec<todo::Model> = Todo::find().all(db).await.unwrap();
     // access to the database
-    HttpResponse::Ok().body(todo_lists)
+    Ok(web::Json(AllTodoLists {
+        todo_lists: all_todo_lists,
+        todos: all_todos,
+    }))
+}
+async fn create_todo(data: web::Data<AppState>, todo: web::Json<todo::Model>) -> impl Responder {
+    // access to the database
+    let db = &data.db;
+    let todo: todo::ActiveModel = todo.into_inner().into();
+    let res = todo.save(db).await;
+    match res{
+        Ok(_) => HttpResponse::Ok().body("Todo created!"),
+        Err(_) => HttpResponse::InternalServerError().body("Error creating todo!"),
+    }
 }
 
-async fn create_todo(req_body: String) -> impl Responder {
+async fn update_todo(todo: web::Json<todo::Model>) -> impl Responder {
     // access to the database
     HttpResponse::Ok().body("Hey there!")
 }
 
-async fn update_todo(id: u32, req_body: String) -> impl Responder {
-    // access to the database
-    HttpResponse::Ok().body("Hey there!")
-}
-
-async fn delete_todo() -> impl Responder {
+async fn delete_todo(todo: web::Json<todo::Model>) -> impl Responder {
     // access to the database
     HttpResponse::Ok().body("Hey there!")
 }
@@ -42,10 +58,10 @@ async fn delete_todo() -> impl Responder {
 async fn main() -> std::io::Result<()> {
     let database_url = "postgres://postgres:password@localhost:5436/todo_db";
     let db = Database::connect(database_url).await.unwrap();
-    let app_state = AppState { db: db.clone() };
+    let app_state = AppState { db: db };
     HttpServer::new(|| {
         App::new()
-        .app_data(web::Data::new(app_state))
+        .app_data(web::Data::new(app_state.clone()))
             .service(
                 web::scope("/todo")
                     .route("/todos", web::get().to(get_todos))

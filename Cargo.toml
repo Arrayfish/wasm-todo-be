@@ -9,6 +9,7 @@ members = [".", "entity", "migration"]
 
 [dependencies]
 actix-web = "4"
-sea-orm = {version = "0.12.7", features=["sqlx-postgres", "runtime-tokio-native-tls", "macros", "mock"]}
+sea-orm = {version = "0.12.7", features=["sqlx-postgres", "runtime-tokio-native-tls", "macros"]}
 entity = { path = "entity" }
 migration = { path = "migration" }
+serde = {version = "1.0.193" , features=["derive"]}
