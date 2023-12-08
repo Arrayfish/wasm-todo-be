@@ -1,4 +1,4 @@
-use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder, Result};
+use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder, Result, middleware::{ErrorHandlerResponse, ErrorHandlers}, http::{StatusCode, header}, dev};
 use sea_orm::{Database, EntityTrait,  DatabaseConnection, ActiveModelTrait, ActiveValue};
 use entity::{prelude::*, *};
 use serde::Serialize;
@@ -131,7 +131,14 @@ async fn delete_todo_list(data: web::Data<AppState>, todo_list: web::Json<todo_l
         },
     }
 }
+fn add_error_header<B>(mut res: dev::ServiceResponse<B>) -> Result<ErrorHandlerResponse<B>> {
+    res.response_mut().headers_mut().insert(
+        header::CONTENT_TYPE,
+        header::HeaderValue::from_static("Error"),
+    );
 
+    Ok(ErrorHandlerResponse::Response(res.map_into_left_body()))
+}
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let database_url = "postgres://postgres:password@localhost:5436/todo_db";
@@ -139,7 +146,9 @@ async fn main() -> std::io::Result<()> {
     let app_state = AppState { db: db };
     HttpServer::new(move || {
         App::new()
+        // .wrap(middleware::DefaultHeaders::new().add("Access-Control-Allow-Origin", "*"))
         .app_data(web::Data::new(app_state.clone()))
+        .wrap(ErrorHandlers::new().handler(StatusCode::INTERNAL_SERVER_ERROR, add_error_header))
             .route("/", web::get().to(get_all_todolists_and_todos))
             .service(
                 web::scope("/todo")
