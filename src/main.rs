@@ -1,7 +1,17 @@
-use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder, Result, middleware::{ErrorHandlerResponse, ErrorHandlers}, http::{StatusCode, header}, dev};
-use sea_orm::{Database, EntityTrait,  DatabaseConnection, ActiveModelTrait, ActiveValue};
+use actix_web::{
+    cookie::Key,
+    dev, get,
+    http::{header, StatusCode},
+    middleware::{ErrorHandlerResponse, ErrorHandlers},
+    post, web, App, HttpResponse, HttpServer, Responder, Result, HttpRequest, HttpMessage,
+};
 use entity::{prelude::*, *};
+use sea_orm::{ActiveModelTrait, ActiveValue, Database, DatabaseConnection, EntityTrait};
 use serde::Serialize;
+use std::time::Duration;
+
+use actix_identity::{Identity, IdentityMiddleware};
+use actix_session::{storage::CookieSessionStore, SessionMiddleware};
 
 #[derive(Debug, Clone)]
 pub struct AppState {
@@ -16,6 +26,21 @@ async fn hello() -> impl Responder {
 #[post("/echo")]
 async fn echo(req_body: String) -> impl Responder {
     HttpResponse::Ok().body(req_body)
+}
+#[derive(Debug, Clone, Serialize)]
+pub struct LoginForm {
+    pub email: String,
+    pub password: String,
+}
+async fn login(data: web::Data<AppState>, request: HttpRequest, json: web::Json<LoginForm>)-> impl Responder{
+    // ユーザの認証
+    let db = &data.db;
+    let user = User::find_by_email(json.email.clone()).one(db).await.unwrap();
+    if user.is_none() {
+        return HttpResponse::Unauthorized().body("Invalid email or password");
+    }
+    Identity::login(&request.extensions(), user.email).unwrap();
+    HttpResponse::Ok().body("Login")
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -47,10 +72,12 @@ async fn create_todo(data: web::Data<AppState>, todo: web::Json<todo::Model>) ->
     let mut todo: todo::ActiveModel = todo.into_inner().into();
     todo.id = ActiveValue::NotSet;
     let res = todo.save(db).await;
-    match res{
-        Ok(_) => HttpResponse::Ok().body(format!("Todo created! id: {:?}",res.unwrap().id.unwrap())),
+    match res {
+        Ok(_) => {
+            HttpResponse::Ok().body(format!("Todo created! id: {:?}", res.unwrap().id.unwrap()))
+        }
         Err(err) => {
-            println!("Error: {}",err);
+            println!("Error: {}", err);
             HttpResponse::InternalServerError().body("Error creating todo!")
         }
     }
@@ -63,13 +90,13 @@ async fn update_todo(data: web::Data<AppState>, todo: web::Json<todo::Model>) ->
     println!("Todo: {:?}", &todo);
     let todo = todo.reset_all();
     let res = todo.update(db).await;
-    match res{
+    match res {
         Ok(res) => {
-            println!("Todo updated: {:?}",res);
+            println!("Todo updated: {:?}", res);
             HttpResponse::Ok().body("Todo updated!")
         }
         Err(err) => {
-            println!("Error: {}",err);
+            println!("Error: {}", err);
             HttpResponse::InternalServerError().body("Error update todo!")
         }
     }
@@ -79,47 +106,59 @@ async fn delete_todo(data: web::Data<AppState>, todo: web::Json<todo::Model>) ->
     // access to the database
     let db = &data.db;
     let res = Todo::delete_by_id(todo.id).exec(db).await;
-    match res{
+    match res {
         Ok(_) => HttpResponse::Ok().body("Todo deleted!"),
         Err(_) => HttpResponse::InternalServerError().body("Error delete todo!"),
     }
 }
 
-async fn create_todo_list(data: web::Data<AppState>, todo_list: web::Json<todo_list::Model>) -> impl Responder {
+async fn create_todo_list(
+    data: web::Data<AppState>,
+    todo_list: web::Json<todo_list::Model>,
+) -> impl Responder {
     // access to the database
     let db = &data.db;
     let mut todo_list: todo_list::ActiveModel = todo_list.into_inner().into();
     todo_list.id = ActiveValue::NotSet;
     let res = todo_list.save(db).await;
-    match res{
-        Ok(_) => HttpResponse::Ok().body(format!("Todo list created! id: {:?}",res.unwrap().id.unwrap())),
+    match res {
+        Ok(_) => HttpResponse::Ok().body(format!(
+            "Todo list created! id: {:?}",
+            res.unwrap().id.unwrap()
+        )),
         Err(err) => {
-            println!("Error: {}",err);
+            println!("Error: {}", err);
             HttpResponse::InternalServerError().body("Error creating todo list!")
         }
     }
 }
 
-async fn update_todo_list(data: web::Data<AppState>, todo_list: web::Json<todo_list::Model>) -> impl Responder {
+async fn update_todo_list(
+    data: web::Data<AppState>,
+    todo_list: web::Json<todo_list::Model>,
+) -> impl Responder {
     // access to the database
     let db = &data.db;
     let todo_list: todo_list::ActiveModel = todo_list.into_inner().into();
     println!("Todo list: {:?}", &todo_list);
     let todo_list = todo_list.reset_all();
     let res = todo_list.update(db).await;
-    match res{
+    match res {
         Ok(res) => {
-            println!("Todo list updated: {:?}",res);
+            println!("Todo list updated: {:?}", res);
             HttpResponse::Ok().body("Todo list updated!")
         }
         Err(err) => {
-            println!("Error: {}",err);
+            println!("Error: {}", err);
             HttpResponse::InternalServerError().body("Error update todo list!")
         }
     }
 }
 
-async fn delete_todo_list(data: web::Data<AppState>, todo_list: web::Json<todo_list::Model>) -> impl Responder {
+async fn delete_todo_list(
+    data: web::Data<AppState>,
+    todo_list: web::Json<todo_list::Model>,
+) -> impl Responder {
     // access to the database
     let db = &data.db;
     let res = TodoList::delete_by_id(todo_list.id).exec(db).await;
@@ -128,7 +167,7 @@ async fn delete_todo_list(data: web::Data<AppState>, todo_list: web::Json<todo_l
         Err(err) => {
             let error_message = format!("Error deleting todo list: {}", err);
             HttpResponse::InternalServerError().body(error_message)
-        },
+        }
     }
 }
 fn add_error_header<B>(mut res: dev::ServiceResponse<B>) -> Result<ErrorHandlerResponse<B>> {
@@ -144,24 +183,36 @@ async fn main() -> std::io::Result<()> {
     let database_url = "postgres://postgres:password@localhost:5436/todo_db";
     let db = Database::connect(database_url).await.unwrap();
     let app_state = AppState { db: db };
+    let secret_key = Key::generate();
     HttpServer::new(move || {
         App::new()
-        // .wrap(middleware::DefaultHeaders::new().add("Access-Control-Allow-Origin", "*"))
-        .app_data(web::Data::new(app_state.clone()))
-        .wrap(ErrorHandlers::new().handler(StatusCode::INTERNAL_SERVER_ERROR, add_error_header))
+            // .wrap(middleware::DefaultHeaders::new().add("Access-Control-Allow-Origin", "*"))
+            .app_data(web::Data::new(app_state.clone()))
+            .wrap(ErrorHandlers::new().handler(StatusCode::INTERNAL_SERVER_ERROR, add_error_header))
+            .wrap(
+                IdentityMiddleware::builder()
+                    .visit_deadline(Some(Duration::new(30 * 60, 0))) // 30 minutes
+                    .login_deadline(Some(Duration::new(24 * 60 * 60, 0))) // 24 hours
+                    .build(),
+            )
+            .wrap(SessionMiddleware::new(
+                CookieSessionStore::default(),
+                secret_key.clone(),
+            ))
             .route("/", web::get().to(get_all_todolists_and_todos))
+            .route("/login", web::get().to(login))
             .service(
                 web::scope("/todo")
-                .route("/create", web::post().to(create_todo))
-                .route("/update", web::post().to(update_todo))
-                .route("/delete", web::post().to(delete_todo))
+                    .route("/create", web::post().to(create_todo))
+                    .route("/update", web::post().to(update_todo))
+                    .route("/delete", web::post().to(delete_todo)),
             )
             .service(
                 web::scope("/todo_list")
-                .route("/create", web::post().to(create_todo_list))
-                .route("/update", web::post().to(update_todo_list))
-                .route("/delete", web::post().to(delete_todo_list)
-                ))
+                    .route("/create", web::post().to(create_todo_list))
+                    .route("/update", web::post().to(update_todo_list))
+                    .route("/delete", web::post().to(delete_todo_list)),
+            )
     })
     .bind(("127.0.0.1", 8081))?
     .run()

@@ -13,3 +13,5 @@ sea-orm = {version = "0.12.7", features=["sqlx-postgres", "runtime-tokio-native-
 entity = { path = "entity" }
 migration = { path = "migration" }
 serde = {version = "1.0.193" , features=["derive"]}
+actix-identity = "0.6.0"
+actix-session = {version = "0.8.0", features = ["cookie-session"]}

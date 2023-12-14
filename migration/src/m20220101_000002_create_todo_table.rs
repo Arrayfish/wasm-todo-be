@@ -28,8 +28,7 @@ impl MigrationTrait for Migration {
                         ForeignKey::create()
                             .name("fk-todo-todolist_id")
                             .from(Todo::Table, Todo::ListId)
-                            .to(TodoList::Table, TodoList::Id)
-
+                            .to(TodoList::Table, TodoList::Id),
                     )
                     .to_owned(),
             )
