@@ -3,7 +3,7 @@ use actix_web::{
     dev, get,
     http::{header, StatusCode},
     middleware::{ErrorHandlerResponse, ErrorHandlers},
-    post, web, App, HttpResponse, HttpServer, Responder, Result, HttpRequest, HttpMessage,
+    post, web, App, HttpMessage, HttpRequest, HttpResponse, HttpServer, Responder, Result,
 };
 use entity::{prelude::*, *};
 use sea_orm::{ActiveModelTrait, ActiveValue, Database, DatabaseConnection, EntityTrait};
@@ -32,10 +32,17 @@ pub struct LoginForm {
     pub email: String,
     pub password: String,
 }
-async fn login(data: web::Data<AppState>, request: HttpRequest, json: web::Json<LoginForm>)-> impl Responder{
+async fn login(
+    data: web::Data<AppState>,
+    request: HttpRequest,
+    json: web::Json<LoginForm>,
+) -> impl Responder {
     // ユーザの認証
     let db = &data.db;
-    let user = User::find_by_email(json.email.clone()).one(db).await.unwrap();
+    let user = User::find_by_email(json.email.clone())
+        .one(db)
+        .await
+        .unwrap();
     if user.is_none() {
         return HttpResponse::Unauthorized().body("Invalid email or password");
     }
@@ -201,6 +208,7 @@ async fn main() -> std::io::Result<()> {
             ))
             .route("/", web::get().to(get_all_todolists_and_todos))
             .route("/login", web::get().to(login))
+            .route("/logout", web::get().to(|| HttpResponse::Ok().finish()))
             .service(
                 web::scope("/todo")
                     .route("/create", web::post().to(create_todo))
