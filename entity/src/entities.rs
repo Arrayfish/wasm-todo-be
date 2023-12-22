@@ -4,3 +4,4 @@ pub mod prelude;
 
 pub mod todo;
 pub mod todo_list;
+pub mod user;

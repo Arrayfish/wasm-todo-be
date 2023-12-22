@@ -12,7 +12,7 @@ use std::time::Duration;
 
 use actix_identity::{Identity, IdentityMiddleware};
 use actix_session::{storage::CookieSessionStore, SessionMiddleware};
-
+use password_hash::PasswordHash;
 #[derive(Debug, Clone)]
 pub struct AppState {
     pub db: DatabaseConnection,
@@ -32,6 +32,24 @@ pub struct LoginForm {
     pub email: String,
     pub password: String,
 }
+async fn register(
+    data: web::Data<AppState>,
+    request: HttpRequest,
+    json: web::Json<LoginForm>,
+) -> impl Responder {
+    let password_hash = PasswordHash::create(&json.password).unwrap();
+    // ユーザの認証
+    let db = &data.db;
+    let user = User::find_by_email(json.email.clone())
+        .one(db)
+        .await
+        .unwrap();
+    if user.is_none() {
+        return HttpResponse::Unauthorized().body("Invalid email or password");
+    }
+    Identity::login(&request.extensions(), user.email).unwrap();
+    HttpResponse::Ok().body("Login")
+}
 async fn login(
     data: web::Data<AppState>,
     request: HttpRequest,
@@ -46,8 +64,15 @@ async fn login(
     if user.is_none() {
         return HttpResponse::Unauthorized().body("Invalid email or password");
     }
+    
+    // if password is ok
     Identity::login(&request.extensions(), user.email).unwrap();
     HttpResponse::Ok().body("Login")
+}
+
+async fn logout(user: Identity) -> impl Responder {
+    user.logout();
+    HttpResponse::Ok().body("Logout")
 }
 
 #[derive(Debug, Clone, Serialize)]

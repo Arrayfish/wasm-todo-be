@@ -2,3 +2,4 @@
 
 pub use super::todo::Entity as Todo;
 pub use super::todo_list::Entity as TodoList;
+pub use super::user::Entity as User;
