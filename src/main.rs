@@ -37,9 +37,15 @@ async fn register(
     request: HttpRequest,
     json: web::Json<LoginForm>,
 ) -> impl Responder {
+    // password hashの作成
     let password_hash = PasswordHash::create(&json.password).unwrap();
-    // ユーザの認証
+    // ユーザの保存
     let db = &data.db;
+    let mut user: user::ActiveModel = user::ActiveModel {
+        id: ActiveValue::NotSet,
+        email: Set(json.email.clone()),
+        password: Set(password_hash.to_string()),
+    };
     let user = User::find_by_email(json.email.clone())
         .one(db)
         .await
@@ -57,7 +63,7 @@ async fn login(
 ) -> impl Responder {
     // ユーザの認証
     let db = &data.db;
-    let user = User::find_by_email(json.email.clone())
+    let user = User::find_by_email(&json.email)
         .one(db)
         .await
         .unwrap();
