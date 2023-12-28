@@ -6,13 +6,13 @@ use actix_web::{
     post, web, App, HttpMessage, HttpRequest, HttpResponse, HttpServer, Responder, Result,
 };
 use entity::{prelude::*, *};
-use sea_orm::{ActiveModelTrait, ActiveValue, Database, DatabaseConnection, EntityTrait};
+use sea_orm::{ActiveModelTrait, ActiveValue, Database, DatabaseConnection, EntityTrait, ColumnTrait, QueryFilter};
 use serde::Serialize;
 use std::time::Duration;
 
 use actix_identity::{Identity, IdentityMiddleware};
 use actix_session::{storage::CookieSessionStore, SessionMiddleware};
-use password_hash::PasswordHash;
+use password_auth;
 #[derive(Debug, Clone)]
 pub struct AppState {
     pub db: DatabaseConnection,
@@ -38,22 +38,24 @@ async fn register(
     json: web::Json<LoginForm>,
 ) -> impl Responder {
     // password hashの作成
-    let password_hash = PasswordHash::create(&json.password).unwrap();
+    let password_hash = password_auth::generate_hash(&json.password);
     // ユーザの保存
     let db = &data.db;
-    let mut user: user::ActiveModel = user::ActiveModel {
+    let user: user::ActiveModel = user::ActiveModel {
         id: ActiveValue::NotSet,
-        email: Set(json.email.clone()),
-        password: Set(password_hash.to_string()),
+        email: ActiveValue::Set(json.email.clone()),
+        password: ActiveValue::Set(password_hash),
     };
-    let user = User::find_by_email(json.email.clone())
-        .one(db)
-        .await
-        .unwrap();
-    if user.is_none() {
-        return HttpResponse::Unauthorized().body("Invalid email or password");
+    match User::insert(user).exec(db).await{
+        Ok(_) => {
+            println!("User created!");
+            Identity::login(&request.extensions(), json.email.clone()).unwrap();
+        }
+        Err(err) => {
+            println!("Error: {}", err);
+            return HttpResponse::InternalServerError().body("Error creating user!")
+        }
     }
-    Identity::login(&request.extensions(), user.email).unwrap();
     HttpResponse::Ok().body("Login")
 }
 async fn login(
@@ -63,16 +65,22 @@ async fn login(
 ) -> impl Responder {
     // ユーザの認証
     let db = &data.db;
-    let user = User::find_by_email(&json.email)
+    let user_option: Option<user::Model> = User::find()
+        .filter(user::Column::Email.eq(json.email.clone()))
         .one(db)
         .await
         .unwrap();
-    if user.is_none() {
+    if let Some(user) =  user_option{
+        match password_auth::verify_password(&json.password, &user.password){
+            Ok(_) => println!("Password is ok"),
+            Err(_) => return HttpResponse::Unauthorized().body("Invalid email or password"),
+        }
+        // if password is ok
+        Identity::login(&request.extensions(), user.email).unwrap();
+    }
+    else {
         return HttpResponse::Unauthorized().body("Invalid email or password");
     }
-    
-    // if password is ok
-    Identity::login(&request.extensions(), user.email).unwrap();
     HttpResponse::Ok().body("Login")
 }
 

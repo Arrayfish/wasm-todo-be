@@ -15,5 +15,4 @@ migration = { path = "migration" }
 serde = {version = "1.0.193" , features=["derive"]}
 actix-identity = "0.6.0"
 actix-session = {version = "0.8.0", features = ["cookie-session"]}
-jsonwebtoken = "9.2.0"
-password-hash = "0.5.0"
+password-auth = "1.0.0"
