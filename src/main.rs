@@ -7,7 +7,7 @@ use actix_web::{
 };
 use entity::{prelude::*, *};
 use sea_orm::{ActiveModelTrait, ActiveValue, Database, DatabaseConnection, EntityTrait, ColumnTrait, QueryFilter};
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 use std::time::Duration;
 
 use actix_identity::{Identity, IdentityMiddleware};
@@ -27,7 +27,7 @@ async fn hello() -> impl Responder {
 async fn echo(req_body: String) -> impl Responder {
     HttpResponse::Ok().body(req_body)
 }
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LoginForm {
     pub email: String,
     pub password: String,
@@ -246,8 +246,9 @@ async fn main() -> std::io::Result<()> {
                 secret_key.clone(),
             ))
             .route("/", web::get().to(get_all_todolists_and_todos))
-            .route("/login", web::get().to(login))
-            .route("/logout", web::get().to(|| HttpResponse::Ok().finish()))
+            .route("/login", web::post().to(login))
+            .route("/logout", web::get().to(logout))
+            .route("/register", web::post().to(register))
             .service(
                 web::scope("/todo")
                     .route("/create", web::post().to(create_todo))
