@@ -6,8 +6,11 @@ use actix_web::{
     post, web, App, HttpMessage, HttpRequest, HttpResponse, HttpServer, Responder, Result,
 };
 use entity::{prelude::*, *};
-use sea_orm::{ActiveModelTrait, ActiveValue, Database, DatabaseConnection, EntityTrait, ColumnTrait, QueryFilter};
-use serde::{Serialize, Deserialize};
+use sea_orm::{
+    ActiveModelTrait, ActiveValue, ColumnTrait, Database, DatabaseConnection, EntityTrait,
+    QueryFilter,
+};
+use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 use actix_identity::{Identity, IdentityMiddleware};
@@ -46,14 +49,14 @@ async fn register(
         email: ActiveValue::Set(json.email.clone()),
         password: ActiveValue::Set(password_hash),
     };
-    match User::insert(user).exec(db).await{
+    match User::insert(user).exec(db).await {
         Ok(_) => {
             println!("User created!");
             Identity::login(&request.extensions(), json.email.clone()).unwrap();
         }
         Err(err) => {
             println!("Error: {}", err);
-            return HttpResponse::InternalServerError().body("Error creating user!")
+            return HttpResponse::InternalServerError().body("Error creating user!");
         }
     }
     HttpResponse::Ok().body("Login")
@@ -70,15 +73,15 @@ async fn login(
         .one(db)
         .await
         .unwrap();
-    if let Some(user) =  user_option{
-        match password_auth::verify_password(&json.password, &user.password){
-            Ok(_) => println!("Password is ok"),
+    if let Some(user) = user_option {
+        match password_auth::verify_password(&json.password, &user.password) {
+            Ok(_) => {
+                println!("Password is ok");
+                Identity::login(&request.extensions(), user.email).unwrap();
+            }
             Err(_) => return HttpResponse::Unauthorized().body("Invalid email or password"),
         }
-        // if password is ok
-        Identity::login(&request.extensions(), user.email).unwrap();
-    }
-    else {
+    } else {
         return HttpResponse::Unauthorized().body("Invalid email or password");
     }
     HttpResponse::Ok().body("Login")
