@@ -16,3 +16,4 @@ serde = {version = "1.0.193" , features=["derive"]}
 actix-identity = "0.6.0"
 actix-session = {version = "0.8.0", features = ["cookie-session"]}
 password-auth = "1.0.0"
+futures-util = "0.3.30"

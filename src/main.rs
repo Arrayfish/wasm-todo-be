@@ -1,3 +1,4 @@
+mod login_check;
 use actix_web::{
     cookie::Key,
     dev, get,
@@ -16,6 +17,8 @@ use std::time::Duration;
 use actix_identity::{Identity, IdentityMiddleware};
 use actix_session::{storage::CookieSessionStore, SessionMiddleware};
 use password_auth;
+
+use login_check::CheckLogin;
 #[derive(Debug, Clone)]
 pub struct AppState {
     pub db: DatabaseConnection,
@@ -248,10 +251,14 @@ async fn main() -> std::io::Result<()> {
                 CookieSessionStore::default(),
                 secret_key.clone(),
             ))
+            .service(
+                web::scope("/auth")
+                    .route("/login", web::post().to(login))
+                    .route("/logout", web::get().to(logout))
+                    .route("/register", web::post().to(register)),
+            )
+            .wrap(CheckLogin)
             .route("/", web::get().to(get_all_todolists_and_todos))
-            .route("/login", web::post().to(login))
-            .route("/logout", web::get().to(logout))
-            .route("/register", web::post().to(register))
             .service(
                 web::scope("/todo")
                     .route("/create", web::post().to(create_todo))
