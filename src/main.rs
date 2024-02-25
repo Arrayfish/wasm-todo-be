@@ -100,7 +100,16 @@ pub struct AllTodoLists {
     pub todo_lists: Vec<todo_list::Model>,
     pub todos: Vec<todo::Model>,
 }
-async fn get_all_todolists_and_todos(data: web::Data<AppState>) -> Result<impl Responder> {
+async fn get_all_todolists_and_todos(
+    data: web::Data<AppState>,
+    user: Option<Identity>,
+) -> Result<impl Responder> {
+    if let Some(user) = user {
+        println!("User: {:?}", user.id().unwrap());
+    } else {
+        println!("No user");
+    }
+
     // TODO: get user id from the session
     let db = &data.db;
     let all_todo_lists: Vec<todo_list::Model> = TodoList::find().all(db).await.unwrap();
@@ -241,6 +250,10 @@ async fn main() -> std::io::Result<()> {
             // .wrap(middleware::DefaultHeaders::new().add("Access-Control-Allow-Origin", "*"))
             .app_data(web::Data::new(app_state.clone()))
             .wrap(ErrorHandlers::new().handler(StatusCode::INTERNAL_SERVER_ERROR, add_error_header))
+            .wrap(CheckLogin::new(vec![
+                "/auth/login".to_string(),
+                "/auth/register".to_string(),
+            ]))
             .wrap(
                 IdentityMiddleware::builder()
                     .visit_deadline(Some(Duration::new(30 * 60, 0))) // 30 minutes
@@ -257,7 +270,6 @@ async fn main() -> std::io::Result<()> {
                     .route("/logout", web::get().to(logout))
                     .route("/register", web::post().to(register)),
             )
-            .wrap(CheckLogin)
             .route("/", web::get().to(get_all_todolists_and_todos))
             .service(
                 web::scope("/todo")
