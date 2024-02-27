@@ -1,9 +1,10 @@
 mod login_check;
+use sea_orm::LoaderTrait;
 use actix_web::{
     cookie::Key,
     dev, get,
     http::{header, StatusCode},
-    middleware::{ErrorHandlerResponse, ErrorHandlers},
+    middleware::{ErrorHandlerResponse, ErrorHandlers, DefaultHeaders},
     post, web, App, HttpMessage, HttpRequest, HttpResponse, HttpServer, Responder, Result,
 };
 use entity::{prelude::*, *};
@@ -98,25 +99,27 @@ async fn logout(user: Identity) -> impl Responder {
 #[derive(Debug, Clone, Serialize)]
 pub struct AllTodoLists {
     pub todo_lists: Vec<todo_list::Model>,
-    pub todos: Vec<todo::Model>,
+    pub todos: Vec<Vec<todo::Model>>,
 }
 async fn get_all_todolists_and_todos(
     data: web::Data<AppState>,
     user: Option<Identity>,
 ) -> Result<impl Responder> {
+    let user_email : String;
     if let Some(user) = user {
-        println!("User: {:?}", user.id().unwrap());
+        user_email = user.id().unwrap();
     } else {
-        println!("No user");
+        return Ok(HttpResponse::Unauthorized().body("Unauthorized"));
     }
 
-    // TODO: get user id from the session
+    
     let db = &data.db;
-    let all_todo_lists: Vec<todo_list::Model> = TodoList::find().all(db).await.unwrap();
-    let all_todos: Vec<todo::Model> = Todo::find().all(db).await.unwrap();
+    let user = User::find().filter(user::Column::Email.eq(user_email)).one(db).await.unwrap().unwrap();
+    let todo_lists: Vec<todo_list::Model> = TodoList::find().filter(todo_list::Column::UserId.eq(user.id)).all(db).await.unwrap();
+    let all_todos: Vec<Vec<todo::Model>> = todo_lists.load_many(Todo, db).await.unwrap();
     // access to the database
-    Ok(web::Json(AllTodoLists {
-        todo_lists: all_todo_lists,
+    Ok(HttpResponse::Ok().json(AllTodoLists {
+        todo_lists: todo_lists,
         todos: all_todos,
     }))
 }
@@ -247,7 +250,14 @@ async fn main() -> std::io::Result<()> {
     let secret_key = Key::generate();
     HttpServer::new(move || {
         App::new()
-            // .wrap(middleware::DefaultHeaders::new().add("Access-Control-Allow-Origin", "*"))
+            .wrap(DefaultHeaders::new()
+                .add(("Strict-Transport-Security", "max-age=63072000; includeSubDomains"))
+                .add(("Content-Security-Policy", "default-src 'self'"))
+                .add(("X-Content-Type-Options", "nosniff"))
+                .add(("X-Frame-Options", "SAMEORIGIN"))
+                .add(("X-XSS-Protection", "1; mode=block"))
+                .add(("Access-Control-Allow-Origin", "*"))
+            )
             .app_data(web::Data::new(app_state.clone()))
             .wrap(ErrorHandlers::new().handler(StatusCode::INTERNAL_SERVER_ERROR, add_error_header))
             .wrap(CheckLogin::new(vec![

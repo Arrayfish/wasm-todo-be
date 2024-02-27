@@ -1,17 +1,12 @@
-// Github Copilotから出てきたものをコピペしただけなので、動作するかもわからない
-use actix_identity::{Identity, IdentityExt};
+use actix_identity::IdentityExt;
 use actix_web::{
     body::EitherBody,
     dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
     http,
-    web::Redirect,
-    Error, HttpMessage, HttpResponse,
+    Error, HttpResponse,
 };
 use futures_util::future::LocalBoxFuture;
-use std::{
-    fmt::Debug,
-    future::{ready, Ready},
-};
+use std::future::{ready, Ready};
 
 pub struct CheckLogin {
     exclude_path_list: Vec<String>,
