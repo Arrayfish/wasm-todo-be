@@ -54,9 +54,9 @@ async fn register(
         password: ActiveValue::Set(password_hash),
     };
     match User::insert(user).exec(db).await {
-        Ok(_) => {
-            println!("User created!");
-            Identity::login(&request.extensions(), json.email.clone()).unwrap();
+        Ok(inserted_user) => {
+            println!("User created with ID: {}", inserted_user.last_insert_id);
+            Identity::login(&request.extensions(), inserted_user.last_insert_id.to_string()).unwrap();
         }
         Err(err) => {
             println!("Error: {}", err);
@@ -81,7 +81,7 @@ async fn login(
         match password_auth::verify_password(&json.password, &user.password) {
             Ok(_) => {
                 println!("Password is ok");
-                Identity::login(&request.extensions(), user.email).unwrap();
+                Identity::login(&request.extensions(), user.id.to_string()).unwrap();
             }
             Err(_) => return HttpResponse::Unauthorized().body("Invalid email or password"),
         }
@@ -105,17 +105,16 @@ async fn get_all_todolists_and_todos(
     data: web::Data<AppState>,
     user: Option<Identity>,
 ) -> Result<impl Responder> {
-    let user_email : String;
+    let user_id : String;
     if let Some(user) = user {
-        user_email = user.id().unwrap();
+        user_id = user.id().unwrap();
     } else {
         return Ok(HttpResponse::Unauthorized().body("Unauthorized"));
     }
 
     
     let db = &data.db;
-    let user = User::find().filter(user::Column::Email.eq(user_email)).one(db).await.unwrap().unwrap();
-    let todo_lists: Vec<todo_list::Model> = TodoList::find().filter(todo_list::Column::UserId.eq(user.id)).all(db).await.unwrap();
+    let todo_lists: Vec<todo_list::Model> = TodoList::find().filter(todo_list::Column::UserId.eq(user_id)).all(db).await.unwrap();
     let all_todos: Vec<Vec<todo::Model>> = todo_lists.load_many(Todo, db).await.unwrap();
     // access to the database
     Ok(HttpResponse::Ok().json(AllTodoLists {
@@ -179,11 +178,17 @@ async fn delete_todo(data: web::Data<AppState>, todo: web::Json<todo::Model>) ->
 async fn create_todo_list(
     data: web::Data<AppState>,
     todo_list: web::Json<todo_list::Model>,
+    user: Option<Identity>,
 ) -> impl Responder {
     // access to the database
     let db = &data.db;
     let mut todo_list: todo_list::ActiveModel = todo_list.into_inner().into();
     todo_list.id = ActiveValue::NotSet;
+    if let Some(user) = user {
+        todo_list.user_id = ActiveValue::Set(user.id().unwrap().parse().unwrap());
+    } else {
+        return HttpResponse::Unauthorized().body("Unauthorized");
+    }
     let res = todo_list.save(db).await;
     match res {
         Ok(_) => HttpResponse::Ok().body(format!(
