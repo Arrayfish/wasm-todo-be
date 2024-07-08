@@ -1,12 +1,22 @@
-use serde::{Deserialize, Serialize};
-use actix_web::{web, HttpResponse, Responder, get, post, delete, put};
+use serde::Serialize;
+use actix_web::{web, HttpResponse, Responder, Result, get, post, delete, put};
+use actix_identity::Identity;
+use sea_orm::{LoaderTrait, ActiveValue};
+use entity::{prelude::*, *};
+use crate::app::AppState;
+
 
 #[derive(Debug, Clone, Serialize)]
 pub struct AllTodoLists {
     pub todo_lists: Vec<todo_list::Model>,
     pub todos: Vec<Vec<todo::Model>>,
 }
-async fn get_all_todolists_and_todos(
+/**
+ * Get all todo lists and todos
+ * @returns {AllTodoLists} AllTodoLists
+ * @throws {Error} error
+ */
+pub async fn get_all_todolists_and_todos(
     data: web::Data<AppState>,
     user: Option<Identity>,
 ) -> Result<impl Responder> {
@@ -34,7 +44,7 @@ async fn get_all_todolists_and_todos(
  * @returns {todo::Model} todo
  * @throws {Error} error
  */
-async fn create_todo(data: web::Data<AppState>, todo: web::Json<todo::Model>) -> impl Responder {
+pub async fn create_todo(data: web::Data<AppState>, todo: web::Json<todo::Model>) -> impl Responder {
     // access to the database
     let db = &data.db;
     let mut todo: todo::ActiveModel = todo.into_inner().into();
@@ -51,7 +61,7 @@ async fn create_todo(data: web::Data<AppState>, todo: web::Json<todo::Model>) ->
     }
 }
 
-async fn update_todo(data: web::Data<AppState>, todo: web::Json<todo::Model>) -> impl Responder {
+pub async fn update_todo(data: web::Data<AppState>, todo: web::Json<todo::Model>) -> impl Responder {
     // access to the database
     let db = &data.db;
     let todo: todo::ActiveModel = todo.into_inner().into();
@@ -70,7 +80,7 @@ async fn update_todo(data: web::Data<AppState>, todo: web::Json<todo::Model>) ->
     }
 }
 
-async fn delete_todo(data: web::Data<AppState>, todo: web::Json<todo::Model>) -> impl Responder {
+pub async fn delete_todo(data: web::Data<AppState>, todo: web::Json<todo::Model>) -> impl Responder {
     // access to the database
     let db = &data.db;
     let res = Todo::delete_by_id(todo.id).exec(db).await;
@@ -80,7 +90,7 @@ async fn delete_todo(data: web::Data<AppState>, todo: web::Json<todo::Model>) ->
     }
 }
 
-async fn create_todo_list(
+pub async fn create_todo_list(
     data: web::Data<AppState>,
     todo_list: web::Json<todo_list::Model>,
     user: Option<Identity>,
@@ -107,7 +117,7 @@ async fn create_todo_list(
     }
 }
 
-async fn update_todo_list(
+pub async fn update_todo_list(
     data: web::Data<AppState>,
     todo_list: web::Json<todo_list::Model>,
 ) -> impl Responder {
@@ -129,7 +139,7 @@ async fn update_todo_list(
     }
 }
 
-async fn delete_todo_list(
+pub async fn delete_todo_list(
     data: web::Data<AppState>,
     todo_list: web::Json<todo_list::Model>,
 ) -> impl Responder {

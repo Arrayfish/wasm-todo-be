@@ -1,5 +1,5 @@
 mod login_check;
-use sea_orm::LoaderTrait;
+
 use actix_web::{
     cookie::Key,
     dev, get,
@@ -9,7 +9,7 @@ use actix_web::{
 };
 use entity::{prelude::*, *};
 use sea_orm::{
-    ActiveModelTrait, ActiveValue, ColumnTrait, Database, DatabaseConnection, EntityTrait,
+ActiveModelTrait, ActiveValue, ColumnTrait, Database, EntityTrait,
     QueryFilter,
 };
 use serde::{Deserialize, Serialize};
@@ -20,13 +20,19 @@ use actix_session::{storage::CookieSessionStore, SessionMiddleware};
 use password_auth;
 
 use login_check::CheckLogin;
+mod app;
+use app::AppState;
 mod todo;
+use todo::{
+    create_todo,
+    delete_todo,
+    update_todo,
+    get_all_todolists_and_todos,
+    create_todo_list,
+    update_todo_list,
+    delete_todo_list,
+};
 
-
-#[derive(Debug, Clone)]
-pub struct AppState {
-    pub db: DatabaseConnection,
-}
 
 #[get("/")]
 async fn hello() -> impl Responder {
